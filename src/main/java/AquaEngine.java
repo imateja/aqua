@@ -57,6 +57,7 @@ public class AquaEngine extends ApplicationAdapter {
         shader.bind();
 
         shader.setUniformMatrix("u_projTrans", new com.badlogic.gdx.math.Matrix4().setToOrtho2D(-1, -1, 2, 2));
+        //the pic that im rendering is known as 0 in gpu
         shader.setUniformi("u_texture", 0);
 
         mesh.render(shader, GL20.GL_TRIANGLES);
