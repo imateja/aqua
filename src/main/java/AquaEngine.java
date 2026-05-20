@@ -5,7 +5,8 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.Vector3;
-
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 public class AquaEngine extends ApplicationAdapter {
 
     private Texture texture;
@@ -47,6 +48,17 @@ public class AquaEngine extends ApplicationAdapter {
     private final float stateB_X = -0.4f;
     private final float stateB_Y = 0.3f;
 
+    private static final int BUFF_SIZE=256;
+    private static final int PORT=9000;
+    private volatile float externalParam = 0.5f;
+    private boolean isRunning = true;
+    private Thread networkThread;
+
+    private void disableThread() {
+        isRunning = false;
+        return;
+    }
+
     @Override
     public void create() {
         texture = new Texture(Gdx.files.internal("star.png"));
@@ -60,6 +72,35 @@ public class AquaEngine extends ApplicationAdapter {
         mesh.setIndices(indices);
 
         camera = new OrthographicCamera(CAMWIDTH, CAMHEIGHT);
+
+        networkThread = new Thread(() -> {
+            try {
+                //udp is more suitable for my use-case, don't care about validity of every package
+                DatagramSocket socket = new DatagramSocket(PORT);
+                byte[] buffer = new byte[BUFF_SIZE];
+
+                System.out.println("listening on 9000");
+
+                while (isRunning) {
+                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                    socket.receive(packet); //blocking func call
+                    String data = new String(packet.getData(), 0, packet.getLength()).trim();
+                    try {
+                        float newValue = Float.parseFloat(data);
+                        // Clamp between 0.0 and 1.0 to prevent crazy mesh explosions
+                        externalParam = Math.max(0.0f, Math.min(1.0f, newValue));
+                    } catch (NumberFormatException e) {
+                        System.out.println("Received junk data: " + data);
+                    }
+                }
+                socket.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
+        networkThread.setDaemon(true);
+        networkThread.start();
     }
 
     @Override
@@ -69,9 +110,7 @@ public class AquaEngine extends ApplicationAdapter {
 
         camera.update();
 
-        float time = Gdx.graphics.getFrameId() * Gdx.graphics.getDeltaTime();
-        float rawSensorData = (float) Math.sin(time * 2.0f);
-        float param = (rawSensorData + 1.0f) / 2.0f;
+        float param = externalParam;
 
         float currentX = stateA_X + (stateB_X - stateA_X) * param;
         float currentY = stateA_Y + (stateB_Y - stateA_Y) * param;
@@ -90,7 +129,7 @@ public class AquaEngine extends ApplicationAdapter {
 
     @Override
     public void dispose() {
-
+        disableThread();
         texture.dispose();
         mesh.dispose();
         shader.dispose();
