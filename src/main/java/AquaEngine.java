@@ -41,6 +41,12 @@ public class AquaEngine extends ApplicationAdapter {
             4, 5, 8,  4, 8, 7  // Top-right quad
     };
 
+    private final float stateA_X = 0.0f;
+    private final float stateA_Y = 0.0f;
+
+    private final float stateB_X = -0.4f;
+    private final float stateB_Y = 0.3f;
+
     @Override
     public void create() {
         texture = new Texture(Gdx.files.internal("star.png"));
@@ -54,25 +60,6 @@ public class AquaEngine extends ApplicationAdapter {
         mesh.setIndices(indices);
 
         camera = new OrthographicCamera(CAMWIDTH, CAMHEIGHT);
-
-        Gdx.input.setInputProcessor(new InputAdapter() {
-            Vector3 mousePos = new Vector3();
-
-            @Override
-            public boolean touchDragged(int screenX, int screenY, int pointer) {
-                // my width x height in pixels -> -1.0 to 1.0 grid
-                mousePos.set(screenX, screenY, 0);
-                camera.unproject(mousePos);
-
-                // move center vertex coords to my mouse
-                vertices[CENTER_VERTEX_INDEX] = mousePos.x;
-                vertices[CENTER_VERTEX_INDEX + 1] = mousePos.y;
-
-                mesh.setVertices(vertices);
-
-                return true;
-            }
-        });
     }
 
     @Override
@@ -82,9 +69,18 @@ public class AquaEngine extends ApplicationAdapter {
 
         camera.update();
 
+        float time = Gdx.graphics.getFrameId() * Gdx.graphics.getDeltaTime();
+        float rawSensorData = (float) Math.sin(time * 2.0f);
+        float param = (rawSensorData + 1.0f) / 2.0f;
+
+        float currentX = stateA_X + (stateB_X - stateA_X) * param;
+        float currentY = stateA_Y + (stateB_Y - stateA_Y) * param;
+        vertices[CENTER_VERTEX_INDEX] = currentX;
+        vertices[CENTER_VERTEX_INDEX + 1] = currentY;
+        mesh.setVertices(vertices);
+
         texture.bind();
         shader.bind();
-
         shader.setUniformMatrix("u_projTrans", camera.combined);
         //the pic that im rendering is known as 0 in gpu
         shader.setUniformi("u_texture", 0);
