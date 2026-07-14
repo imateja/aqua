@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.Vector3;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+
 public class AquaEngine extends ApplicationAdapter {
 
     private Texture texture;
@@ -45,7 +46,11 @@ public class AquaEngine extends ApplicationAdapter {
 
     private static final int BUFF_SIZE=256;
     private static final int PORT=9000;
-    private volatile float externalParam = 0.5f;
+
+    // We split our external tracking parameter into X and Y components
+    private volatile float externalParamX = 0.5f;
+    private volatile float externalParamY = 0.5f;
+
     private boolean isRunning = true;
     private Thread networkThread;
 
@@ -82,10 +87,17 @@ public class AquaEngine extends ApplicationAdapter {
                     socket.receive(packet); //blocking func call
                     String data = new String(packet.getData(), 0, packet.getLength()).trim();
                     try {
-                        float newValue = Float.parseFloat(data);
-                        // Clamp between 0.0 and 1.0 to prevent crazy mesh explosions
-                        externalParam = Math.max(0.0f, Math.min(1.0f, newValue));
-                    } catch (NumberFormatException e) {
+                        // Split the incoming message (expecting "paramX,paramY" format)
+                        String[] parts = data.split(",");
+                        if (parts.length == 2) {
+                            float rawX = Float.parseFloat(parts[0]);
+                            float rawY = Float.parseFloat(parts[1]);
+
+                            // Clamp between 0.0 and 1.0 to prevent crazy mesh explosions
+                            externalParamX = Math.max(0.0f, Math.min(1.0f, rawX));
+                            externalParamY = Math.max(0.0f, Math.min(1.0f, rawY));
+                        }
+                    } catch (Exception e) {
                         System.out.println("Received junk data: " + data);
                     }
                 }
@@ -106,21 +118,31 @@ public class AquaEngine extends ApplicationAdapter {
 
         camera.update();
 
-        float param = externalParam;
+        float paramX = externalParamX;
+        float paramY = externalParamY;
 
         // convert 0.0 -> 1.0 into a turn multiplier of -1.0 -> 1.0
-        float turnMultiplier = (param - 0.5f) * 2.0f;
+        float turnMultiplierX = (paramX - 0.5f) * 2.0f;
+        float turnMultiplierY = (paramY - 0.5f) * 2.0f;
 
-        int[] middleColumnXIndices = {5, 20, 35};
+
         //why these numbers? every vertex is X,Y,color,TexX,TexY.
+        int[] middleColumnXIndices = {5, 20, 35};
+
         //i am warping the spine of my image(vertices 1,4 and 7) and i want X coords of those vertices.
         // since every vertex is 5 numbers, then X of vertex 1 would be the 5th number in 1D array(which is how RAM sees this)
         //X coord of vertex 4 would be the 20th number, and so on.
-
+        int[] middleRowYIndices = {16, 21, 26};
         float maxStretch = 0.35f;
 
+        // Update the horizontal deformation
         for (int index : middleColumnXIndices) {
-            vertices[index] = turnMultiplier * maxStretch;
+            vertices[index] = turnMultiplierX * maxStretch;
+        }
+
+        // Update the vertical deformation
+        for (int index : middleRowYIndices) {
+            vertices[index] = turnMultiplierY * maxStretch;
         }
 
         // Push the mutated array back to the GPU
@@ -129,6 +151,7 @@ public class AquaEngine extends ApplicationAdapter {
         texture.bind();
         shader.bind();
         shader.setUniformMatrix("u_projTrans", camera.combined);
+        //the pic that im rendering is known as 0 in gpu
         shader.setUniformi("u_texture", 0);
 
         mesh.render(shader, GL20.GL_TRIANGLES);

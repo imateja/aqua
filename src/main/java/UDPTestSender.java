@@ -9,24 +9,28 @@ public class UDPTestSender {
             DatagramSocket socket = new DatagramSocket();
             InetAddress localAddress = InetAddress.getByName("localhost"); // Send to our own computer
 
-            System.out.println("Starting fake face-tracker stream...");
+            System.out.println("Starting fake 2D face-tracker stream...");
             float time = 0;
 
             while (true) {
-                // 1. Generate a fake parameter from 0.0 to 1.0
-                float fakeSensorData = (float) ((Math.sin(time) + 1.0) / 2.0);
+                // 1. Generate a fake X parameter from 0.0 to 1.0 (Horizontal turn)
+                float fakeX = (float) ((Math.sin(time) + 1.0) / 2.0);
 
-                // 2. Convert that number into a String, and then into raw bytes
-                String message = String.valueOf(fakeSensorData);
+                // 2. Generate a fake Y parameter from 0.0 to 1.0 (Vertical nod)
+                // We use cosine here so it's slightly out of sync with X, creating a circular motion!
+                float fakeY = (float) ((Math.cos(time * 0.8) + 1.0) / 2.0);
+
+                // 3. Package both numbers separated by a comma (e.g. "0.75,0.42")
+                String message = fakeX + "," + fakeY;
                 byte[] buffer = message.getBytes();
 
-                // 3. Package it up and fire it at port 9000
+                // 4. Package it up and fire it at port 9000
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length, localAddress, 9000);
                 socket.send(packet);
 
-                System.out.println("Sent tracking data: " + message);
+                System.out.println("Sent 2D tracking data: " + message);
 
-                // 4. Move time forward and wait 50 milliseconds (simulating 20 frames per second)
+                // 5. Move time forward and wait 50 milliseconds (simulating 20 frames per second)
                 time += 0.1f;
                 Thread.sleep(50);
             }
