@@ -42,11 +42,6 @@ public class AquaEngine extends ApplicationAdapter {
             4, 5, 8,  4, 8, 7  // Top-right quad
     };
 
-    private final float stateA_X = 0.0f;
-    private final float stateA_Y = 0.0f;
-
-    private final float stateB_X = -0.4f;
-    private final float stateB_Y = 0.3f;
 
     private static final int BUFF_SIZE=256;
     private static final int PORT=9000;
@@ -73,6 +68,7 @@ public class AquaEngine extends ApplicationAdapter {
 
         camera = new OrthographicCamera(CAMWIDTH, CAMHEIGHT);
 
+        //there needs to be a network thread cuz i don't want my whole app to stop while it waits for params from camera
         networkThread = new Thread(() -> {
             try {
                 //udp is more suitable for my use-case, don't care about validity of every package
@@ -99,7 +95,7 @@ public class AquaEngine extends ApplicationAdapter {
             }
         });
 
-        networkThread.setDaemon(true);
+        networkThread.setDaemon(true); //daemon threads get killed when their parent program dies. i dont want more packets after i shut down the engine.
         networkThread.start();
     }
 
@@ -112,16 +108,27 @@ public class AquaEngine extends ApplicationAdapter {
 
         float param = externalParam;
 
-        float currentX = stateA_X + (stateB_X - stateA_X) * param;
-        float currentY = stateA_Y + (stateB_Y - stateA_Y) * param;
-        vertices[CENTER_VERTEX_INDEX] = currentX;
-        vertices[CENTER_VERTEX_INDEX + 1] = currentY;
+        // convert 0.0 -> 1.0 into a turn multiplier of -1.0 -> 1.0
+        float turnMultiplier = (param - 0.5f) * 2.0f;
+
+        int[] middleColumnXIndices = {5, 20, 35};
+        //why these numbers? every vertex is X,Y,color,TexX,TexY.
+        //i am warping the spine of my image(vertices 1,4 and 7) and i want X coords of those vertices.
+        // since every vertex is 5 numbers, then X of vertex 1 would be the 5th number in 1D array(which is how RAM sees this)
+        //X coord of vertex 4 would be the 20th number, and so on.
+
+        float maxStretch = 0.35f;
+
+        for (int index : middleColumnXIndices) {
+            vertices[index] = turnMultiplier * maxStretch;
+        }
+
+        // Push the mutated array back to the GPU
         mesh.setVertices(vertices);
 
         texture.bind();
         shader.bind();
         shader.setUniformMatrix("u_projTrans", camera.combined);
-        //the pic that im rendering is known as 0 in gpu
         shader.setUniformi("u_texture", 0);
 
         mesh.render(shader, GL20.GL_TRIANGLES);
