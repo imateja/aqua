@@ -24,8 +24,7 @@ public class ArtMesh {
     private final int[] middleRowYIndices = {16, 21, 26};
     private final float maxStretch = 0.35f;
 
-    // Constructor: When we type 'new ArtMesh()', it builds the grid automatically
-    public ArtMesh(String imagePath) {
+    public ArtMesh(String imagePath, float offsetX, float offsetY, float scale) {
         texture = new Texture(Gdx.files.internal(imagePath));
 
         float c = Color.WHITE.toFloatBits();
@@ -43,7 +42,11 @@ public class ArtMesh {
                 0.5f,  0.5f, c, 1.0f, 0.0f
         };
 
-        // Create our working copy
+        for (int i = 0; i < baseVertices.length; i += 5) {
+            baseVertices[i] = (baseVertices[i] * scale) + offsetX;         // X coordinate
+            baseVertices[i + 1] = (baseVertices[i + 1] * scale) + offsetY; // Y coordinate
+        }
+
         currentVertices = baseVertices.clone();
 
         indices = new short[] {
@@ -61,31 +64,40 @@ public class ArtMesh {
         mesh.setIndices(indices);
     }
 
-    // The engine just hands this object a multiplier, and it handles its own internal math
     public void update(float turnMultiplierX, float turnMultiplierY) {
-        // Reset to baseline so math errors don't accumulate
+        update(turnMultiplierX, turnMultiplierY, 1.0f);
+    }
+
+    public void update(float turnMultiplierX, float turnMultiplierY, float blinkMultiplier) {
         System.arraycopy(baseVertices, 0, currentVertices, 0, baseVertices.length);
 
-        // Apply Horizontal Warp
         for (int index : middleColumnXIndices) {
             currentVertices[index] += turnMultiplierX * maxStretch;
         }
 
-        // Apply Vertical Warp
         for (int index : middleRowYIndices) {
             currentVertices[index] += turnMultiplierY * maxStretch;
+        }
+
+        // If this is the eye mesh, compress all Y vertices toward the center when blinking (blinkMultiplier approaches 0.0)
+        if (blinkMultiplier < 1.0f) {
+            // Find the vertical center (Y average or anchor around baseline center Y)
+            // Every Y coordinate is at index + 1 for each of the 9 vertices (indices 1, 6, 11, 16, 21, 26, 31, 36, 41)
+            float centerY = 0.0f; // Since base mesh is centered around 0
+            for (int i = 1; i < currentVertices.length; i += 5) {
+                float originalY = currentVertices[i];
+                currentVertices[i] = centerY + (originalY - centerY) * blinkMultiplier;
+            }
         }
 
         mesh.setVertices(currentVertices);
     }
 
-    // The engine tells it when to draw itself
     public void render(ShaderProgram shader) {
         texture.bind();
         mesh.render(shader, GL20.GL_TRIANGLES);
     }
 
-    // Clean up GPU memory
     public void dispose() {
         texture.dispose();
         mesh.dispose();
