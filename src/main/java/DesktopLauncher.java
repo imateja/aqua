@@ -8,7 +8,7 @@ public class DesktopLauncher {
 
     public static void main(String[] args) {
         Lwjgl3ApplicationConfiguration config =  new Lwjgl3ApplicationConfiguration();
-        config.setTitle("triangle-mesh");
+        config.setTitle("Aqua");
         config.setWindowedMode(WIDTH,HEIGHT);
         config.useVsync(VSYNC_TOGGLE);
 
